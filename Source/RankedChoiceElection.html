@@ -1,0 +1,315 @@
+<html>
+<body>
+
+<div id="divUI">
+
+	<h3>Ranked-Choice Election</h3>
+
+	<p>In a ranked-choice election, each voter specifies a list of candidates in descending order of preference.  The list could include every single candidate, or a particular subset of the candidates, or even just a single candidate.  Then each voter's first choice is tabulated.  The candidate or candidates with the fewest votes are eliminated from the election.  Then the votes are tabulated again, with any votes for eliminated candidates replaced with those voter's next preferred candidate.  The process repeats until there is either only one candidate remaining, or at least all remaining candidates have the same number of votes.</p>
+
+	<p>Enter the candidates and votes in the specified formats, then click the Find button to run a ranked-choice election and see the results.  Click the Load Demo button to load an example election.</p>
+
+	<button onclick="buttonDemo_Clicked();">Load Demo</button>
+	<br />
+
+	<label>Candidates to Choose From (as lines, in format "A:Alice"):</label>
+	<br />
+	<textarea id="textareaCandidates" cols="40" rows="10"></textarea>
+	<br />
+
+	<label>Votes (as lines, in format "Gina:E,A,B,C,D,F"):</label>
+	<br />
+	<textarea id="textareaVotes" cols="40" rows="10"></textarea>
+	<br />
+
+	<label>Results:</label>
+	<button onclick="buttonResultsFind_Clicked();">Find</button>
+	<br />
+	<textarea id="textareaResults" cols="40" rows="10"></textarea>
+	<br />
+	
+</div>
+
+<script type="text/javascript">
+
+// UI event handlers.
+
+function buttonDemo_Clicked()
+{
+	var electionDemo = ElectionRankedChoice.demo();
+
+	var candidatesAsString =
+		electionDemo.candidates.map(x => x.id + ":" + x.name).join("\n");
+	var votesAsString =
+		electionDemo.votes.map(x => x.toString()).join("\n");
+
+	var d = document;
+	var textareaCandidates = d.getElementById("textareaCandidates");
+	var textareaVotes = d.getElementById("textareaVotes");
+	
+	textareaCandidates.value = candidatesAsString;
+	textareaVotes.value = votesAsString;
+}
+
+function buttonResultsFind_Clicked()
+{
+	var d = document;
+	var textareaCandidates = d.getElementById("textareaCandidates");
+	var textareaVotes = d.getElementById("textareaVotes");
+	var textareaResults = d.getElementById("textareaResults");
+
+	var candidatesAsString = textareaCandidates.value;
+	var votesAsString = textareaVotes.value;
+
+	var election = ElectionRankedChoice.fromStringsCandidateAndVote
+	(
+		candidatesAsString, votesAsString
+	);
+
+	if (election == null)
+	{
+		textareaResults.value = "Invalid input!";
+	}
+	else
+	{
+		var resultAsRounds = election.resultAsRounds();
+		var roundsAsString =
+			resultAsRounds.map(x => x.toString()).join("\n");
+
+		var roundFinal = resultAsRounds[resultAsRounds.length - 1];
+		var candidateWinningId =
+			roundFinal.candidateIdsAndVotesSorted[0][0];
+		var candidateWinning =
+			election.candidatesById.get(candidateWinningId);
+		var result =
+			roundsAsString + "\n"
+			+ "Winner:" + candidateWinning.name;
+
+		textareaResults.value = result;
+	}
+}
+
+// Classes.
+
+class Candidate
+{
+	constructor(id, name)
+	{
+		this.id = id;
+		this.name = name;
+	}
+
+	static parse(stringToParse)
+	{
+		var parts = stringToParse.split(":");
+		var returnValue = new Candidate(parts[0], parts[1]);
+		return returnValue;
+	}
+}
+
+class ElectionRankedChoice
+{
+	constructor(candidates, votes)
+	{
+		this.candidates = candidates;
+		this.votes = votes;
+
+		this.candidatesById =
+			new Map(this.candidates.map(x => [x.id, x] ) );
+	}
+
+	static demo()
+	{
+		var candidates =
+		[
+			new Candidate("A", "Alice"),
+			new Candidate("B", "Bob"),
+			new Candidate("C", "Carol"),
+			new Candidate("D", "Dave"),
+			new Candidate("E", "Erin"),
+			new Candidate("F", "Frank"),
+		];
+		var votes =
+		[
+			new Vote("Gina", [ "E", "A", "B", "C", "D", "F" ] ),
+			new Vote("Henry", [ "F", "E", "D", "C", "B", "A" ] ),
+			new Vote("Irene", [ "C" ] ),
+			new Vote("Jim", [ "A", "C", "E" ] ),
+			new Vote("Karen", [ "B", "D", "F" ] ),
+			new Vote("Lou", [ "C", "D", "B", "E" ] ),
+			new Vote("Mary", [ "D" ] ),
+			new Vote("Nate", [ "E", "D" ] ),
+			new Vote("Olive", [ "B" ] ),
+			new Vote("Paul", [ "F", "D" ] ),
+			new Vote("Quinta", [ "A" ] ),
+			new Vote("Ron", [ "C", "B", "F" ] ),
+			new Vote("Sally", [ "B" ] ),
+			new Vote("Tom", [ "E" ] ),
+			new Vote("Ursula", [ "C" ] ),
+			new Vote("Vern", [ "D" ] ),
+			new Vote("Wilma", [ "A", "E", "B" ] ),
+			new Vote("Xavier", [ "F" ] ),
+			new Vote("Yolanda", [ "B", "F", "A" ] ),
+			new Vote("Zach", [ "C", "A", "B" ]),
+		];
+
+		var returnValue = new ElectionRankedChoice
+		(
+			candidates, votes
+		);
+
+		return returnValue;
+	}
+
+	static fromStringsCandidateAndVote(candidatesAsString, votesAsString)
+	{
+		var returnValue = null;
+
+		try
+		{
+			var candidates = candidatesAsString.split("\n").map
+			(
+				x => Candidate.parse(x)
+			);
+
+			var votes = votesAsString.split("\n").map
+			(
+				x => Vote.parse(x)
+			);
+
+			returnValue =
+				new ElectionRankedChoice(candidates, votes);
+		}
+		catch (ex)
+		{
+			// Do nothing.
+		}
+
+		return returnValue;
+	}
+
+	resultAsRounds()
+	{
+		var votes = this.votes;
+
+		var roundCount = this.candidates.length;
+		var roundsSoFar = [];
+		var candidatesRemaining = this.candidates;
+
+		while (candidatesRemaining.length > 0)
+		{
+			var votesByCandidateId = new Map();
+
+			for (var c = 0; c < candidatesRemaining.length; c++)
+			{
+				var candidate = candidatesRemaining[c];
+				votesByCandidateId.set(candidate.id, 0);
+			}
+
+			for (var v = 0; v < votes.length; v++)
+			{
+				var vote = votes[v];
+				var candidateIds = vote.candidateIdsByPreference;
+				for (var c = 0; c < candidateIds.length; c++)
+				{
+					var candidateId = candidateIds[c];
+					var isCandidateNotYetEliminated =
+						votesByCandidateId.has(candidateId);
+					
+					if (isCandidateNotYetEliminated)
+					{
+						var votesForCandidate =
+							votesByCandidateId.get(candidateId);
+						votesForCandidate++;
+						votesByCandidateId.set
+						(
+							candidateId, votesForCandidate
+						);
+						break;
+					}
+				}
+			}
+
+			var candidateIdsAndVotes = Array.from(votesByCandidateId);
+			var candidateIdsAndVotesSorted =
+				candidateIdsAndVotes.sort((a, b) => b[1] - a[1]);
+	
+			var round = new Round
+			(
+				roundsSoFar.length, candidateIdsAndVotesSorted
+			);
+			roundsSoFar.push(round);
+		
+			var votesFewestForAnyCandidate =
+				candidateIdsAndVotesSorted[candidateIdsAndVotesSorted.length - 1][1];
+
+			var candidateIdsWithFewestVotes =
+				candidateIdsAndVotesSorted.filter
+				(
+					x => x[1] == votesFewestForAnyCandidate
+				).map
+				(
+					y => y[0]
+				);
+
+			candidatesRemaining = candidatesRemaining.filter
+			(
+				x => candidateIdsWithFewestVotes.indexOf(x.id) == -1
+			);
+		}
+
+		return roundsSoFar;
+	}
+}
+
+class Round
+{
+	constructor(roundNumber, candidateIdsAndVotesSorted)
+	{
+		this.roundNumber = roundNumber;
+		this.candidateIdsAndVotesSorted = candidateIdsAndVotesSorted;
+	}
+
+	toString()
+	{
+		var returnValue =
+			this.roundNumber + ": "
+			+ this.candidateIdsAndVotesSorted.map
+			(
+				x => x[0] + ":" + x[1]
+			).join(",");
+		return returnValue;
+	}
+}
+
+class Vote
+{
+	constructor(voterName, candidateIdsByPreference)
+	{
+		this.voterName = voterName;
+		this.candidateIdsByPreference =
+			candidateIdsByPreference;
+	}
+
+	static parse(stringToParse)
+	{
+		var parts = stringToParse.split(":");
+		var voterName = parts[0];
+		var candidateIds = parts[1].split(",");
+		var returnValue = new Vote(voterName, candidateIds);
+		return returnValue;
+	}
+
+	toString()
+	{
+		var returnValue =
+			this.voterName + ":"
+			+ this.candidateIdsByPreference.join(",");
+
+		return returnValue;
+	}
+}
+
+</script>
+</body>
+</html>
